@@ -1,0 +1,48 @@
+$schema: https://azuremlschemas.azureedge.net/latest/pipelineJob.schema.json
+type: pipeline
+experiment_name: diabetes-pipeline-example
+
+compute: azureml:<your-compute-instance>
+settings:
+  datastore: azureml:workspaceblobstore
+
+outputs: 
+  pipeline_job_trained_model:
+    mode: upload
+
+jobs:
+  stats_job:
+    type: command
+    component: file:./summary-stats.yml
+    inputs:
+      input_data:
+        type: uri_folder
+        path: azureml:diabetes-data:1 
+
+  fix_missing_job:
+    type: command
+    component: file:./fix-missing-data.yml
+    inputs:
+      input_data:
+        type: uri_folder
+        path: azureml:diabetes-data:1 
+    outputs:
+      output_data:
+        mode: upload
+
+  normalize_job:
+    type: command
+    component: file:./normalize-data.yml
+    inputs:
+      input_data: ${{parent.jobs.fix_missing_job.outputs.output_data}}
+    outputs:
+      output_data:
+        mode: upload
+
+  train_job:
+    type: command
+    component: file:./train-decision-tree.yml
+    inputs:
+      training_data: ${{parent.jobs.normalize_job.outputs.output_data}}
+    outputs:
+      model_output: ${{parent.outputs.pipeline_job_trained_model}}
